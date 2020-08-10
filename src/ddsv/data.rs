@@ -103,10 +103,9 @@ impl Process {
     }
 }
 
-pub fn make_initial_state(r0: &SharedVars, ps: &Vec<Process>) -> Vec<(SharedVars, String)> {
-    ps.iter()
-        .map(|p| (r0.clone(), p.0[0].0.clone()))
-        .collect::<Vec<(SharedVars, String)>>()
+pub fn make_initial_state(r0: &SharedVars, ps: &Vec<Process>) -> (SharedVars, Vec<String>) {
+    let v = ps.iter().map(|p| p.0[0].0.clone()).collect::<Vec<String>>();
+    (r0.clone(), v)
 }
 
 // pub fn calc_transition(

@@ -131,9 +131,8 @@ mod tests {
             ],
         };
         let v = make_initial_state(&r0, &vec![process_p, process_q]);
-        assert_eq!(v[0].0, r0);
-        assert_eq!(v[0].1, "P0");
-        assert_eq!(v[1].0, r0);
-        assert_eq!(v[1].1, "Q0");
+        assert_eq!(v.0, r0);
+        assert_eq!(v.1[0], "P0");
+        assert_eq!(v.1[1], "Q0");
     }
 }
