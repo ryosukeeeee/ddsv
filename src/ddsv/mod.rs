@@ -122,7 +122,7 @@ mod tests {
                         Box::new(|_r| true),
                         Box::new(|r| {
                             let mut s = r.clone();
-                            s.x = r.t2;
+                            s.x = r.t2 + 1;
                             s
                         }),
                     )],
@@ -131,8 +131,29 @@ mod tests {
             ],
         };
         let v = make_initial_state(&r0, &vec![process_p, process_q]);
-        assert_eq!(v.0, r0);
+        assert_eq!(v.0, r0.clone());
         assert_eq!(v.1[0], "P0");
         assert_eq!(v.1[1], "Q0");
+        let next = calc_transitions(
+            vec![],
+            &r0,
+            &[String::from("P1")],
+            &[String::from("Q1")],
+            &[Trans::new(
+                String::from("write"),
+                String::from("Q3"),
+                Box::new(|_r| true),
+                Box::new(|r| {
+                    let mut s = r.clone();
+                    s.x = r.t2;
+                    s
+                }),
+            )],
+        );
+        assert_eq!(next.len(), 1);
+        assert_eq!(next[0].0, "write");
+        assert_eq!((next[0].1).0, r0.clone());
+        assert_eq!((next[0].1).1, vec!["P1", "Q3", "Q1"]);
+        println!("next[0]: {:?}", next[0]);
     }
 }

@@ -103,53 +103,62 @@ impl Process {
     }
 }
 
-pub fn make_initial_state(r0: &SharedVars, ps: &Vec<Process>) -> (SharedVars, Vec<String>) {
+pub fn make_initial_state(r0: &SharedVars, ps: &[Process]) -> (SharedVars, Vec<String>) {
     let v = ps.iter().map(|p| p.0[0].0.clone()).collect::<Vec<String>>();
     (r0.clone(), v)
 }
 
-// pub fn calc_transition(
-//     acc: Vec<(String, String)>,
-//     r: SharedVars,
-//     rs: Vec<String>,
-//     ls: Vec<String>,
-//     transitions: Vec<Trans>,
-// ) {
-//     transitions
-//         .iter()
-//         .fold(acc, |acc, (label, target, guard, action)| {
-//             if (guard)(r) {
-//                 let locations =
-//                 let target = ((action)(r), locations);
-//                 let t = (label, target);
-//                 acc.insert(0, t);
-//                 acc
-//             } else {
-//                 acc
-//             }
-//         })
-// }
+pub fn calc_transitions(
+    acc: Vec<(String, (SharedVars, Vec<String>))>,
+    r: &SharedVars,
+    rs: &[String],
+    ls: &[String],
+    transitions: &[Trans],
+) -> Vec<(String, (SharedVars, Vec<String>))> {
+    let tmp = transitions.iter().fold(acc, |acc_, trans| {
+        if (trans.guard)(r.clone()) {
+            // guardが成立 => 遷移可能
+            let label = &trans.label; // label = "read"
+            let mut v1 = ls.to_vec(); // ls = (sk, sk+1, ..., sn)
+            v1.insert(0, trans.location.clone()); // location = P1
+            let mut locations = rs.to_vec(); // rs = (sk-1, sk-2, ..., s2, s1)
+            locations.reverse();
+            locations.append(&mut v1);
+            // target = (遷移後の共有変数, (s1, s2, ..., sn))
+            let target = ((trans.action)(r.clone()), locations);
+            // t = ("read", (遷移後の共有変数, (s1, s2, ..., sn)))
+            let t = (String::from(label), target);
+            let mut acc__ = acc_.clone();
+            acc__.push(t);
+            acc__
+        } else {
+            acc_
+        }
+    });
+    tmp
+}
 
-// pub fn collect_trans(
-//     acc: Vec<(String, String)>,
-//     r: SharedVars,
-//     rs: Vec<String>,
-//     ls: Vec<String>,
-//     ps: Vec<Process>,
-// ) -> Vec<(String, String)> {
-//     match (ls, ps) {
-//         (vec![], vec![]) => acc,
-//         (l, p) => {
-//             let (location, ls_2) = l.split_first().unwrap();
-//             let (process, ps_2) = p.split_first().unwrap();
-//             // p_first
-//             let transitions = process.assoc(&location);
-//             let acc_ = calc_transition(acc, r, rs, ls_2.to_vec(), transitions);
-//             collect_trans(acc, r, rs, ls_2.to_vec(), ps_2.to_vec());
-//             vec![]
-//         }
-//     }
-// }
+pub fn collect_trans(
+    acc: Vec<(String, (SharedVars, Vec<String>))>,
+    r: &SharedVars,
+    rs: &[String], // (sk-1, sk-2, ..., s2, s1)
+    ls: &[String], // (sk, sk+1, ..., sn)
+    ps: &[Process],
+) -> Vec<(String, (SharedVars, Vec<String>))> {
+    match (ls, ps) {
+        ([], []) => acc,
+        (l, p) => {
+            let (location, ls_2) = l.split_first().unwrap();
+            let (process, ps_2) = p.split_first().unwrap();
+            if let Some(transitions) = process.assoc(&location) {
+                let acc = calc_transitions(acc, r, rs, ls_2, transitions);
+                return collect_trans(acc, r, rs, ls_2, ps_2);
+            } else {
+                return vec![];
+            }
+        }
+    }
+}
 
 // pub fn make_next_function(ps: Vec<Process>) {}
 
