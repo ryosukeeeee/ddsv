@@ -49,7 +49,7 @@ mod tests {
                     vec![Trans::new(
                         String::from("read"),
                         String::from("P1"),
-                        Box::new(|r| true),
+                        Box::new(|_r| true),
                         Box::new(|r| {
                             let mut s = r.clone();
                             s.t1 = r.x;
@@ -62,7 +62,7 @@ mod tests {
                     vec![Trans::new(
                         String::from("inc"),
                         String::from("P2"),
-                        Box::new(|r| true),
+                        Box::new(|_r| true),
                         Box::new(|r| {
                             let mut s = r.clone();
                             s.t1 = r.t1 + 1;
@@ -75,7 +75,7 @@ mod tests {
                     vec![Trans::new(
                         String::from("write"),
                         String::from("P3"),
-                        Box::new(|r| true),
+                        Box::new(|_r| true),
                         Box::new(|r| {
                             let mut s = r.clone();
                             s.x = r.t1;
@@ -93,7 +93,7 @@ mod tests {
                     vec![Trans::new(
                         String::from("read"),
                         String::from("Q1"),
-                        Box::new(|r| true),
+                        Box::new(|_r| true),
                         Box::new(|r| {
                             let mut s = r.clone();
                             s.t2 = r.x;
@@ -106,7 +106,7 @@ mod tests {
                     vec![Trans::new(
                         String::from("inc"),
                         String::from("Q2"),
-                        Box::new(|r| true),
+                        Box::new(|_r| true),
                         Box::new(|r| {
                             let mut s = r.clone();
                             s.t2 = r.t2 + 1;
@@ -119,7 +119,7 @@ mod tests {
                     vec![Trans::new(
                         String::from("write"),
                         String::from("Q3"),
-                        Box::new(|r| true),
+                        Box::new(|_r| true),
                         Box::new(|r| {
                             let mut s = r.clone();
                             s.x = r.t2;
