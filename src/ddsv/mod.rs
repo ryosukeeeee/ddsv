@@ -1,22 +1,26 @@
 pub mod data;
-// pub mod trans;
 
 #[cfg(test)]
 mod tests {
     use super::data::*;
-
+    use env_logger;
+    use std::env;
+    fn init() {
+        env::set_var("RUST_LOG", "debug");
+        env_logger::init();
+    }
     #[test]
     fn trans_test() {
         let t = Trans::new(
             String::from("read"),
             String::from("P1"),
             Box::new(|_r| true),
-            Box::new(|r| r),
+            Box::new(|r| r.clone()),
         );
         assert_eq!(t.label, String::from("read"));
         assert_eq!(t.location, String::from("P1"));
-        assert_eq!((t.guard)(SharedVars::new()), true);
-        assert_eq!((t.action)(SharedVars::new()), SharedVars::new());
+        assert_eq!((t.guard)(&SharedVars::new()), true);
+        assert_eq!((t.action)(&SharedVars::new()), SharedVars::new());
     }
     #[test]
     fn trans_print_test() {
@@ -24,7 +28,7 @@ mod tests {
             String::from("read"),
             String::from("P1"),
             Box::new(|_r| true),
-            Box::new(|r| r),
+            Box::new(|r| r.clone()),
         );
         assert_eq!(
             format!("{:?}", t),
@@ -159,6 +163,7 @@ mod tests {
 
     #[test]
     fn collect_trans_test() {
+        init();
         let calcs = collect_trans(
             vec![],
             &SharedVars { x: 0, t1: 0, t2: 0 },
