@@ -1,5 +1,17 @@
 pub mod data;
 
+use data::{Process, SharedVars, Trans};
+
+type Guard = Box<dyn Fn(&SharedVars) -> bool>;
+type Action = Box<dyn Fn(&SharedVars) -> SharedVars>;
+type Label = String;
+type Location = String;
+// type Trans = (label, location, guard, action);
+// type ProcessElem = (Location, Vec<Trans>);
+type State = (SharedVars, Vec<Location>);
+type Ps = Vec<(Location, Vec<Trans>)>;
+type Path = Vec<(Label, State)>;
+
 #[cfg(test)]
 mod tests {
     use super::data::*;

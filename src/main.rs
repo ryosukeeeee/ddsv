@@ -193,5 +193,6 @@ fn main() {
     let s0 = data::make_initial_state(&r0, &vec![process_p, process_q]);
     let next = data::make_next_function(vec![process_p2, process_q2]);
     let lts = data::bfs(s0, next, "---");
-    println!("lts.0: {:?}", lts.1);
+    // println!("lts.0: {:?}", lts.1);
+    data::lts_print_deadlock(lts);
 }
