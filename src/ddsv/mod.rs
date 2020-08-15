@@ -2,8 +2,8 @@ pub mod data;
 
 use data::SharedVars;
 
-type Guard = Box<dyn Fn(&SharedVars) -> bool>;
-type Action = Box<dyn Fn(&SharedVars) -> SharedVars>;
+type Guard = fn(&SharedVars) -> bool;
+type Action = fn(&SharedVars) -> SharedVars;
 type Label = String;
 type Location = String;
 type State = (SharedVars, Vec<Location>);
@@ -18,13 +18,53 @@ mod tests {
         env::set_var("RUST_LOG", "debug");
         env_logger::init();
     }
+
+    fn always_true(_r: &SharedVars) -> bool {
+        true
+    }
+    fn return_copied(r: &SharedVars) -> SharedVars {
+        r.clone()
+    }
+
+    fn increment_t1(r: &SharedVars) -> SharedVars {
+        let mut s = r.clone();
+        s.t1 = r.t1 + 1;
+        s
+    }
+
+    fn increment_t2(r: &SharedVars) -> SharedVars {
+        let mut s = r.clone();
+        s.t2 = r.t2 + 1;
+        s
+    }
+    fn move_t1_to_x(r: &SharedVars) -> SharedVars {
+        let mut s = r.clone();
+        s.x = r.t1;
+        s
+    }
+
+    fn move_t2_to_x(r: &SharedVars) -> SharedVars {
+        let mut s = r.clone();
+        s.x = r.t2;
+        s
+    }
+    fn move_x_to_t1(r: &SharedVars) -> SharedVars {
+        let mut s = r.clone();
+        s.t1 = r.x;
+        s
+    }
+    fn move_x_to_t2(r: &SharedVars) -> SharedVars {
+        let mut s = r.clone();
+        s.t2 = r.x;
+        s
+    }
     #[test]
     fn trans_test() {
         let t = Trans::new(
             String::from("read"),
             String::from("P1"),
-            Box::new(|_r| true),
-            Box::new(|r| r.clone()),
+            always_true,
+            return_copied,
         );
         assert_eq!(t.label, String::from("read"));
         assert_eq!(t.location, String::from("P1"));
@@ -36,8 +76,8 @@ mod tests {
         let t = Trans::new(
             String::from("read"),
             String::from("P1"),
-            Box::new(|_r| true),
-            Box::new(|r| r.clone()),
+            always_true,
+            return_copied,
         );
         assert_eq!(
             format!("{:?}", t),
@@ -55,12 +95,8 @@ mod tests {
                     vec![Trans::new(
                         String::from("read"),
                         String::from("P1"),
-                        Box::new(|_r| true),
-                        Box::new(|r| {
-                            let mut s = r.clone();
-                            s.t1 = r.x;
-                            s
-                        }),
+                        always_true,
+                        move_x_to_t1,
                     )],
                 ),
                 (
@@ -68,12 +104,8 @@ mod tests {
                     vec![Trans::new(
                         String::from("inc"),
                         String::from("P2"),
-                        Box::new(|_r| true),
-                        Box::new(|r| {
-                            let mut s = r.clone();
-                            s.t1 = r.t1 + 1;
-                            s
-                        }),
+                        always_true,
+                        increment_t1,
                     )],
                 ),
                 (
@@ -81,12 +113,8 @@ mod tests {
                     vec![Trans::new(
                         String::from("write"),
                         String::from("P3"),
-                        Box::new(|_r| true),
-                        Box::new(|r| {
-                            let mut s = r.clone();
-                            s.x = r.t1;
-                            s
-                        }),
+                        always_true,
+                        move_t1_to_x,
                     )],
                 ),
                 (String::from("P3"), vec![]),
@@ -99,12 +127,8 @@ mod tests {
                     vec![Trans::new(
                         String::from("read"),
                         String::from("Q1"),
-                        Box::new(|_r| true),
-                        Box::new(|r| {
-                            let mut s = r.clone();
-                            s.t2 = r.x;
-                            s
-                        }),
+                        always_true,
+                        move_x_to_t2,
                     )],
                 ),
                 (
@@ -112,12 +136,8 @@ mod tests {
                     vec![Trans::new(
                         String::from("inc"),
                         String::from("Q2"),
-                        Box::new(|_r| true),
-                        Box::new(|r| {
-                            let mut s = r.clone();
-                            s.t2 = r.t2 + 1;
-                            s
-                        }),
+                        always_true,
+                        increment_t2,
                     )],
                 ),
                 (
@@ -125,12 +145,8 @@ mod tests {
                     vec![Trans::new(
                         String::from("write"),
                         String::from("Q3"),
-                        Box::new(|_r| true),
-                        Box::new(|r| {
-                            let mut s = r.clone();
-                            s.x = r.t2 + 1;
-                            s
-                        }),
+                        always_true,
+                        move_t2_to_x,
                     )],
                 ),
                 (String::from("Q3"), vec![]),
@@ -153,18 +169,14 @@ mod tests {
             &[Trans::new(
                 String::from("write"),
                 String::from("Q3"),
-                Box::new(|_r| true),
-                Box::new(|r| {
-                    let mut s = r.clone();
-                    s.x = r.t2 + 1;
-                    s
-                }),
+                always_true,
+                increment_t1,
             )],
         );
         assert_eq!(next.len(), 1);
         assert_eq!(next[0].0, "write");
         let mut r1 = r0.clone();
-        r1.x = 1;
+        r1.t1 = 1;
         assert_eq!((next[0].1).0, r1);
         assert_eq!((next[0].1).1, vec!["P1", "Q3", "Q1"]);
         println!("next[0]: {:?}", next[0]);
@@ -186,12 +198,8 @@ mod tests {
                             vec![Trans::new(
                                 String::from("read"),
                                 String::from("P1"),
-                                Box::new(|_r| true),
-                                Box::new(|r| {
-                                    let mut s = r.clone();
-                                    s.t1 = r.x;
-                                    s
-                                }),
+                                always_true,
+                                move_x_to_t1,
                             )],
                         ),
                         (
@@ -199,12 +207,8 @@ mod tests {
                             vec![Trans::new(
                                 String::from("inc"),
                                 String::from("P2"),
-                                Box::new(|_r| true),
-                                Box::new(|r| {
-                                    let mut s = r.clone();
-                                    s.t1 = r.t1 + 1;
-                                    s
-                                }),
+                                always_true,
+                                increment_t1,
                             )],
                         ),
                         (
@@ -212,12 +216,8 @@ mod tests {
                             vec![Trans::new(
                                 String::from("write"),
                                 String::from("P3"),
-                                Box::new(|_r| true),
-                                Box::new(|r| {
-                                    let mut s = r.clone();
-                                    s.x = r.t1;
-                                    s
-                                }),
+                                always_true,
+                                move_t1_to_x,
                             )],
                         ),
                         (String::from("P3"), vec![]),
@@ -230,12 +230,8 @@ mod tests {
                             vec![Trans::new(
                                 String::from("read"),
                                 String::from("Q1"),
-                                Box::new(|_r| true),
-                                Box::new(|r| {
-                                    let mut s = r.clone();
-                                    s.t2 = r.x;
-                                    s
-                                }),
+                                always_true,
+                                move_x_to_t2,
                             )],
                         ),
                         (
@@ -243,12 +239,8 @@ mod tests {
                             vec![Trans::new(
                                 String::from("inc"),
                                 String::from("Q2"),
-                                Box::new(|_r| true),
-                                Box::new(|r| {
-                                    let mut s = r.clone();
-                                    s.t2 = r.t2 + 1;
-                                    s
-                                }),
+                                always_true,
+                                increment_t2,
                             )],
                         ),
                         (
@@ -256,12 +248,8 @@ mod tests {
                             vec![Trans::new(
                                 String::from("write"),
                                 String::from("Q3"),
-                                Box::new(|_r| true),
-                                Box::new(|r| {
-                                    let mut s = r.clone();
-                                    s.x = r.t2 + 1;
-                                    s
-                                }),
+                                always_true,
+                                move_t2_to_x,
                             )],
                         ),
                         (String::from("Q3"), vec![]),

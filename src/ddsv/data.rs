@@ -19,7 +19,7 @@ impl SharedVars {
     }
 }
 
-// #[derive(Clone)]
+#[derive(Clone)]
 pub struct Trans {
     pub label: Label,
     pub location: Location,
@@ -53,7 +53,7 @@ impl PartialEq for SharedVars {
     }
 }
 
-// #[derive(Debug)]
+#[derive(Clone)]
 pub struct Process(pub Vec<(Location, Vec<Trans>)>);
 
 impl fmt::Debug for Process {
