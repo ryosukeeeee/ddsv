@@ -4,12 +4,23 @@ use ddsv::data;
 use ddsv::data::{Process, SharedVars, Trans};
 use env_logger;
 use std::env;
+use std::io::Write;
 
 fn main() {
     env::set_var("RUST_LOG", "info");
-    env_logger::init();
+    env_logger::builder()
+        .format(|buf, record| {
+            writeln!(
+                buf,
+                "{}: L{} {}",
+                record.level(),
+                record.line().unwrap_or(0),
+                record.args()
+            )
+        })
+        .init();
 
-    let r0 = SharedVars { x: 0, t1: 0, t2: 0 };
+    let r0 = SharedVars::new();
     let process_p = Process {
         0: vec![
             (
@@ -75,13 +86,13 @@ fn main() {
             (String::from("Q3"), vec![]),
         ],
     };
-    // process_p.viz_process("p1");
-    // process_q.viz_process("q")
+    process_p.viz_process("m_inc2_P");
+    process_q.viz_process("m_inc2_Q");
     let s0 = data::make_initial_state(&r0, &vec![process_p.clone(), process_q.clone()]);
     let next = data::make_next_function(vec![process_p, process_q]);
     let lts = data::bfs(s0, next, "---");
-    // println!("lts.0: {:?}", lts.1);
-    data::lts_print_deadlock(lts);
+    data::lts_print_deadlock(&lts);
+    data::viz_lts("m_inc2", &lts);
 }
 
 fn always_true(_r: &SharedVars) -> bool {

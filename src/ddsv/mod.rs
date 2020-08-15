@@ -13,6 +13,7 @@ type Path = Vec<(Label, State)>;
 mod tests {
     use super::data::*;
     use env_logger;
+    use std::collections::HashMap;
     use std::env;
     fn init() {
         env::set_var("RUST_LOG", "debug");
