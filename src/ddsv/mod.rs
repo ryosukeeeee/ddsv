@@ -13,10 +13,9 @@ type Path = Vec<(Label, State)>;
 mod tests {
     use super::data::*;
     use env_logger;
-    use std::collections::HashMap;
     use std::env;
     fn init() {
-        env::set_var("RUST_LOG", "debug");
+        env::set_var("RUST_LOG", "info");
         env_logger::init();
     }
 
@@ -88,7 +87,7 @@ mod tests {
 
     #[test]
     fn process_test() {
-        let r0 = SharedVars { x: 0, t1: 0, t2: 0 };
+        let r0 = SharedVars::new();
         let process_p = Process {
             0: vec![
                 (
@@ -161,7 +160,7 @@ mod tests {
 
     #[test]
     fn calc_transitions_test() {
-        let r0 = SharedVars { x: 0, t1: 0, t2: 0 };
+        let r0 = SharedVars::new();
         let next = calc_transitions(
             vec![],
             &r0,
@@ -188,7 +187,7 @@ mod tests {
         init();
         let calcs = collect_trans(
             vec![],
-            &SharedVars { x: 0, t1: 0, t2: 0 },
+            &SharedVars::new(),
             &[],
             &[String::from("P0"), String::from("Q0")],
             &vec![
