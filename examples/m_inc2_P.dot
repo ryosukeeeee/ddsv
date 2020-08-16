@@ -1,9 +1,0 @@
-digraph {
-P0;
-P1;
-P2;
-P3;
-P0 -> P1 [label="read"];
-P1 -> P2 [label="inc"];
-P2 -> P3 [label="write"];
-}
