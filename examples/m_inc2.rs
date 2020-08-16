@@ -110,7 +110,6 @@ fn main() {
     let lts = data::bfs(s0, next, "---");
     data::lts_print_deadlock(&lts);
     data::viz_lts("m_inc2", &lts);
-    println!("Hello world");
 }
 
 fn always_true(_r: &SharedVars) -> bool {
