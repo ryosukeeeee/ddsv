@@ -120,9 +120,7 @@ fn main() {
     };
     process_p.viz_process("m_mutex2_P");
     process_q.viz_process("m_mutex2_Q");
-    let s0 = data::make_initial_state(&r0, &vec![process_p.clone(), process_q.clone()]);
-    let next = data::make_next_function(vec![process_p, process_q]);
-    let lts = data::bfs(s0, next, "---");
+    let lts = data::concurrent_composition(&r0, &vec![process_p, process_q]);
     data::lts_print_deadlock(&lts);
     data::viz_lts("m_mutex2", &lts);
 }

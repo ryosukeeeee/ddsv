@@ -180,11 +180,17 @@ where
     Box::new(move |(r, locs)| return collect_trans(vec![], &r, &[], locs.as_slice(), ps.as_slice()))
 }
 
-// pub fn concurrent_composition(r0: SharedVars, ps: Vec<Vec<(String, Trans)>>) {
-//     let s0 = make_initial_state(r0, ps);
-//     let next = make_next_function(ps);
-//     bfs(s0, next, "---")
-// }
+pub fn concurrent_composition<T>(
+    r0: &T,
+    ps: &[Process<T>],
+) -> (HashMap<State<T>, (i32, Path<T>)>, Vec<Path<T>>)
+where
+    T: Debug + Hash + Eq + Clone + 'static,
+{
+    let s0 = make_initial_state(r0, ps);
+    let next = make_next_function(ps.to_vec());
+    bfs(s0, next, "---")
+}
 
 pub fn bfs<T>(
     s0: State<T>,
