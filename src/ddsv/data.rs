@@ -1,38 +1,24 @@
 use log::debug;
+use std::cmp::Eq;
 use std::collections::{HashMap, VecDeque};
 use std::fmt;
+use std::fmt::Debug;
 use std::fs;
+use std::hash::Hash;
 use std::io::{stdout, BufWriter, Write};
 use std::process::Command;
 
 use super::{Action, Guard, Label, Location, Path, State};
 
-#[derive(Clone, Eq, Hash)]
-pub struct SharedVars {
-    pub x: i32,
-    pub t1: i32,
-    pub t2: i32,
-}
-impl fmt::Debug for SharedVars {
-    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        f.write_fmt(format_args!("x={} t1={} t2={}", self.x, self.t1, self.t2))
-    }
-}
-impl SharedVars {
-    pub fn new() -> SharedVars {
-        SharedVars { x: 0, t1: 0, t2: 0 }
-    }
-}
-
 #[derive(Clone)]
-pub struct Trans {
+pub struct Trans<T> {
     pub label: Label,
     pub location: Location,
-    pub guard: Guard,
-    pub action: Action,
+    pub guard: Guard<T>,
+    pub action: Action<T>,
 }
 
-impl fmt::Debug for Trans {
+impl<T> fmt::Debug for Trans<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         f.debug_struct("Trans")
             .field("label", &self.label)
@@ -41,8 +27,8 @@ impl fmt::Debug for Trans {
     }
 }
 
-impl Trans {
-    pub fn new(label: String, location: String, guard: Guard, action: Action) -> Trans {
+impl<T> Trans<T> {
+    pub fn new(label: String, location: String, guard: Guard<T>, action: Action<T>) -> Trans<T> {
         Trans {
             label: label,
             location: location,
@@ -52,23 +38,17 @@ impl Trans {
     }
 }
 
-impl PartialEq for SharedVars {
-    fn eq(&self, other: &Self) -> bool {
-        self.x == other.x && self.t1 == other.t1 && self.t2 == other.t2
-    }
-}
-
 #[derive(Clone)]
-pub struct Process(pub Vec<(Location, Vec<Trans>)>);
+pub struct Process<T>(pub Vec<(Location, Vec<Trans<T>>)>);
 
-impl fmt::Debug for Process {
+impl<T> fmt::Debug for Process<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         f.debug_list().entries(self.0.iter()).finish()
     }
 }
 
-impl Process {
-    pub fn assoc(&self, location: &str) -> Option<&Vec<Trans>> {
+impl<T> Process<T> {
+    pub fn assoc(&self, location: &str) -> Option<&Vec<Trans<T>>> {
         debug!("location: {}", location);
         for v in &self.0 {
             debug!("assoc: {:?}", v);
@@ -118,18 +98,24 @@ impl Process {
     }
 }
 
-pub fn make_initial_state(r0: &SharedVars, ps: &[Process]) -> State {
+pub fn make_initial_state<T>(r0: &T, ps: &[Process<T>]) -> State<T>
+where
+    T: Clone,
+{
     let v = ps.iter().map(|p| p.0[0].0.clone()).collect::<Vec<String>>();
     (r0.clone(), v)
 }
 
-pub fn calc_transitions(
-    acc: Vec<(Label, State)>,
-    r: &SharedVars,
+pub fn calc_transitions<T>(
+    acc: Vec<(Label, State<T>)>,
+    r: &T,
     rs: &[Location],
     ls: &[Location],
-    transitions: &[Trans],
-) -> Vec<(Label, State)> {
+    transitions: &[Trans<T>],
+) -> Vec<(Label, State<T>)>
+where
+    T: Clone,
+{
     let tmp = transitions.iter().fold(acc, |acc_, trans| {
         if (trans.guard)(&r) {
             // guardが成立 => 遷移可能
@@ -158,13 +144,16 @@ pub fn calc_transitions(
     tmp
 }
 
-pub fn collect_trans(
-    acc: Vec<(Label, State)>,
-    r: &SharedVars,
+pub fn collect_trans<T>(
+    acc: Vec<(Label, State<T>)>,
+    r: &T,
     rs: &[Location], // (sk-1, sk-2, ..., s2, s1)
     ls: &[Location], // (sk, sk+1, ..., sn)
-    ps: &[Process],
-) -> Vec<(Label, State)> {
+    ps: &[Process<T>],
+) -> Vec<(Label, State<T>)>
+where
+    T: Debug + Clone,
+{
     match (ls, ps) {
         ([], []) => {
             debug!("collect_trans: {:?}", acc);
@@ -184,7 +173,10 @@ pub fn collect_trans(
     }
 }
 
-pub fn make_next_function(ps: Vec<Process>) -> Box<dyn Fn(State) -> Vec<(Label, State)>> {
+pub fn make_next_function<T>(ps: Vec<Process<T>>) -> Box<dyn Fn(State<T>) -> Vec<(Label, State<T>)>>
+where
+    T: Debug + Clone + 'static,
+{
     Box::new(move |(r, locs)| return collect_trans(vec![], &r, &[], locs.as_slice(), ps.as_slice()))
 }
 
@@ -194,17 +186,20 @@ pub fn make_next_function(ps: Vec<Process>) -> Box<dyn Fn(State) -> Vec<(Label, 
 //     bfs(s0, next, "---")
 // }
 
-pub fn bfs(
-    s0: State,
-    next: Box<dyn Fn(State) -> Vec<(Label, State)>>,
+pub fn bfs<T>(
+    s0: State<T>,
+    next: Box<dyn Fn(State<T>) -> Vec<(Label, State<T>)>>,
     label0: &str,
-) -> (HashMap<State, (i32, Path)>, Vec<Path>) {
-    let mut hm: HashMap<State, (i32, Path)> = HashMap::new();
+) -> (HashMap<State<T>, (i32, Path<T>)>, Vec<Path<T>>)
+where
+    T: Hash + Eq + Debug + Clone,
+{
+    let mut hm: HashMap<State<T>, (i32, Path<T>)> = HashMap::new();
     hm.insert(s0.clone(), (0, vec![]));
 
-    let mut que: VecDeque<(State, i32, Path)> = VecDeque::new();
+    let mut que: VecDeque<(State<T>, i32, Path<T>)> = VecDeque::new();
     que.push_front((s0.clone(), 0, vec![(label0.to_string(), s0.clone())]));
-    let mut deadlocks: Vec<Path> = vec![];
+    let mut deadlocks: Vec<Path<T>> = vec![];
 
     while !que.is_empty() {
         let (state, id, path) = que.pop_back().unwrap();
@@ -231,7 +226,10 @@ pub fn bfs(
     (hm, deadlocks)
 }
 
-pub fn lts_print_deadlock(lts: &(HashMap<State, (i32, Path)>, Vec<Path>)) {
+pub fn lts_print_deadlock<T>(lts: &(HashMap<State<T>, (i32, Path<T>)>, Vec<Path<T>>))
+where
+    T: Debug,
+{
     let (_, deadlock) = lts;
     for dl in deadlock {
         println!("--------------------------------------");
@@ -239,7 +237,10 @@ pub fn lts_print_deadlock(lts: &(HashMap<State, (i32, Path)>, Vec<Path>)) {
     }
 }
 
-pub fn print_deadlock(deadlock: &Path) {
+pub fn print_deadlock<T>(deadlock: &Path<T>)
+where
+    T: Debug,
+{
     let out = stdout();
     let mut out = BufWriter::new(out.lock());
     for (i, dl) in deadlock.iter().enumerate() {
@@ -256,7 +257,10 @@ pub fn print_locations(ch: &mut dyn Write, locations: &[Location]) {
     }
 }
 
-pub fn viz_lts(filename: &str, lts: &(HashMap<State, (i32, Path)>, Vec<Path>)) {
+pub fn viz_lts<T>(filename: &str, lts: &(HashMap<State<T>, (i32, Path<T>)>, Vec<Path<T>>))
+where
+    T: Debug + Hash + Eq,
+{
     let (ht, _) = lts;
     let mut f = BufWriter::new(fs::File::create(format!("{}.dot", filename)).unwrap());
     f.write("digraph{\n".as_bytes()).unwrap();
@@ -274,7 +278,10 @@ pub fn viz_lts(filename: &str, lts: &(HashMap<State, (i32, Path)>, Vec<Path>)) {
         .expect("failed to visualize");
 }
 
-fn emit_states(ch: &mut dyn Write, hm: &HashMap<State, (i32, Path)>) {
+fn emit_states<T>(ch: &mut dyn Write, hm: &HashMap<State<T>, (i32, Path<T>)>)
+where
+    T: Debug,
+{
     for ((r, locs), (id, trans)) in hm.iter() {
         ch.write(format!("{} [label=\"{}\\n", id, id).as_bytes())
             .unwrap();
@@ -289,7 +296,10 @@ fn emit_states(ch: &mut dyn Write, hm: &HashMap<State, (i32, Path)>) {
     }
 }
 
-fn emit_transitions(ch: &mut dyn Write, hm: &HashMap<State, (i32, Path)>) {
+fn emit_transitions<T>(ch: &mut dyn Write, hm: &HashMap<State<T>, (i32, Path<T>)>)
+where
+    T: Debug + Hash + Eq,
+{
     for (_key, (id, trans)) in hm.iter() {
         for (label, target) in trans {
             let (tid, _) = hm.get(target).unwrap();

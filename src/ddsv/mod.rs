@@ -1,19 +1,41 @@
 pub mod data;
 
-use data::SharedVars;
-
-type Guard = fn(&SharedVars) -> bool;
-type Action = fn(&SharedVars) -> SharedVars;
+type Guard<T> = fn(&T) -> bool;
+type Action<T> = fn(&T) -> T;
 type Label = String;
 type Location = String;
-type State = (SharedVars, Vec<Location>);
-type Path = Vec<(Label, State)>;
+type State<T> = (T, Vec<Location>);
+type Path<T> = Vec<(Label, State<T>)>;
 
 #[cfg(test)]
 mod tests {
     use super::data::*;
     use env_logger;
     use std::env;
+    #[derive(Clone, Eq, Hash)]
+    struct SharedVars {
+        x: i32,
+        t1: i32,
+        t2: i32,
+    }
+
+    impl PartialEq for SharedVars {
+        fn eq(&self, other: &Self) -> bool {
+            self.x == other.x && self.t1 == other.t1 && self.t2 == other.t2
+        }
+    }
+
+    impl SharedVars {
+        fn new() -> SharedVars {
+            SharedVars { x: 0, t1: 0, t2: 0 }
+        }
+    }
+
+    impl std::fmt::Debug for SharedVars {
+        fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+            f.write_fmt(format_args!("x={} t1={} t2={}", self.x, self.t1, self.t2))
+        }
+    }
     fn init() {
         env::set_var("RUST_LOG", "info");
         env_logger::init();
