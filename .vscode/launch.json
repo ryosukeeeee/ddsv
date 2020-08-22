@@ -8,10 +8,9 @@
             "type": "lldb",
             "request": "launch",
             "name": "Debug executable 'ddsv'",
-            "program": "${workspaceRoot}/target/debug/ddsv",
+            "program": "/Users/ryosuke/Downloads/ddsv/src/rust/ddsv/target/debug/examples/m_inc2",
             "sourceLanguages": ["rust"],
             "args": [],
-            "preLaunchTask": "cargo",
             "cwd": "${workspaceFolder}"
         }
     ]
