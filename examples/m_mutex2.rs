@@ -41,39 +41,19 @@ fn main() {
         0: vec![
             (
                 String::from("P0"),
-                vec![Trans::new(
-                    String::from("lock 0"),
-                    String::from("P1"),
-                    is_locked_0,
-                    lock_0,
-                )],
+                vec![Trans::new("lock 0", "P1", is_locked_0, lock_0)],
             ),
             (
                 String::from("P1"),
-                vec![Trans::new(
-                    String::from("lock 1"),
-                    String::from("P2"),
-                    is_locked_1,
-                    lock_1,
-                )],
+                vec![Trans::new("lock 1", "P2", is_locked_1, lock_1)],
             ),
             (
                 String::from("P2"),
-                vec![Trans::new(
-                    String::from("unlock 1"),
-                    String::from("P3"),
-                    always_true,
-                    unlock_1,
-                )],
+                vec![Trans::new("unlock 1", "P3", always_true, unlock_1)],
             ),
             (
                 String::from("P3"),
-                vec![Trans::new(
-                    String::from("unlock 0"),
-                    String::from("P0"),
-                    always_true,
-                    unlock_0,
-                )],
+                vec![Trans::new("unlock 0", "P0", always_true, unlock_0)],
             ),
         ],
     };
@@ -82,39 +62,19 @@ fn main() {
         0: vec![
             (
                 String::from("Q0"),
-                vec![Trans::new(
-                    String::from("lock 1"),
-                    String::from("Q1"),
-                    is_locked_1,
-                    lock_1,
-                )],
+                vec![Trans::new("lock 1", "Q1", is_locked_1, lock_1)],
             ),
             (
                 String::from("Q1"),
-                vec![Trans::new(
-                    String::from("lock 0"),
-                    String::from("Q2"),
-                    is_locked_0,
-                    lock_0,
-                )],
+                vec![Trans::new("lock 0", "Q2", is_locked_0, lock_0)],
             ),
             (
                 String::from("Q2"),
-                vec![Trans::new(
-                    String::from("unlock 0"),
-                    String::from("Q3"),
-                    always_true,
-                    unlock_0,
-                )],
+                vec![Trans::new("unlock 0", "Q3", always_true, unlock_0)],
             ),
             (
                 String::from("Q3"),
-                vec![Trans::new(
-                    String::from("unlock 1"),
-                    String::from("Q0"),
-                    always_true,
-                    unlock_1,
-                )],
+                vec![Trans::new("unlock 1", "Q0", always_true, unlock_1)],
             ),
         ],
     };

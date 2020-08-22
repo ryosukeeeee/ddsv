@@ -82,12 +82,7 @@ mod tests {
     }
     #[test]
     fn trans_test() {
-        let t = Trans::new(
-            String::from("read"),
-            String::from("P1"),
-            always_true,
-            return_copied,
-        );
+        let t = Trans::new("read", "P1", always_true, return_copied);
         assert_eq!(t.label, String::from("read"));
         assert_eq!(t.location, String::from("P1"));
         assert_eq!((t.guard)(&SharedVars::new()), true);
@@ -95,12 +90,7 @@ mod tests {
     }
     #[test]
     fn trans_print_test() {
-        let t = Trans::new(
-            String::from("read"),
-            String::from("P1"),
-            always_true,
-            return_copied,
-        );
+        let t = Trans::new("read", "P1", always_true, return_copied);
         assert_eq!(
             format!("{:?}", t),
             "Trans { label: \"read\", location: \"P1\" }"
@@ -110,70 +100,36 @@ mod tests {
     #[test]
     fn process_test() {
         let r0 = SharedVars::new();
-        let process_p = Process {
-            0: vec![
-                (
-                    String::from("P0"),
-                    vec![Trans::new(
-                        String::from("read"),
-                        String::from("P1"),
-                        always_true,
-                        move_x_to_t1,
-                    )],
-                ),
-                (
-                    String::from("P1"),
-                    vec![Trans::new(
-                        String::from("inc"),
-                        String::from("P2"),
-                        always_true,
-                        increment_t1,
-                    )],
-                ),
-                (
-                    String::from("P2"),
-                    vec![Trans::new(
-                        String::from("write"),
-                        String::from("P3"),
-                        always_true,
-                        move_t1_to_x,
-                    )],
-                ),
-                (String::from("P3"), vec![]),
-            ],
-        };
-        let process_q = Process {
-            0: vec![
-                (
-                    String::from("Q0"),
-                    vec![Trans::new(
-                        String::from("read"),
-                        String::from("Q1"),
-                        always_true,
-                        move_x_to_t2,
-                    )],
-                ),
-                (
-                    String::from("Q1"),
-                    vec![Trans::new(
-                        String::from("inc"),
-                        String::from("Q2"),
-                        always_true,
-                        increment_t2,
-                    )],
-                ),
-                (
-                    String::from("Q2"),
-                    vec![Trans::new(
-                        String::from("write"),
-                        String::from("Q3"),
-                        always_true,
-                        move_t2_to_x,
-                    )],
-                ),
-                (String::from("Q3"), vec![]),
-            ],
-        };
+        let process_p = Process::new(vec![
+            (
+                "P0",
+                vec![Trans::new("read", "P1", always_true, move_x_to_t1)],
+            ),
+            (
+                "P1",
+                vec![Trans::new("inc", "P2", always_true, increment_t1)],
+            ),
+            (
+                "P2",
+                vec![Trans::new("write", "P3", always_true, move_t1_to_x)],
+            ),
+            ("P3", vec![]),
+        ]);
+        let process_q = Process::new(vec![
+            (
+                "Q0",
+                vec![Trans::new("read", "Q1", always_true, move_x_to_t2)],
+            ),
+            (
+                "Q1",
+                vec![Trans::new("inc", "Q2", always_true, increment_t2)],
+            ),
+            (
+                "Q2",
+                vec![Trans::new("write", "Q3", always_true, move_t2_to_x)],
+            ),
+            ("Q3", vec![]),
+        ]);
         let v = make_initial_state(&r0, &vec![process_p, process_q]);
         assert_eq!(v.0, r0.clone());
         assert_eq!(v.1[0], "P0");
@@ -188,12 +144,7 @@ mod tests {
             &r0,
             &[String::from("P1")],
             &[String::from("Q1")],
-            &[Trans::new(
-                String::from("write"),
-                String::from("Q3"),
-                always_true,
-                increment_t1,
-            )],
+            &[Trans::new("write", "Q3", always_true, increment_t1)],
         );
         assert_eq!(next.len(), 1);
         assert_eq!(next[0].0, "write");
@@ -213,70 +164,36 @@ mod tests {
             &[],
             &[String::from("P0"), String::from("Q0")],
             &vec![
-                Process {
-                    0: vec![
-                        (
-                            String::from("P0"),
-                            vec![Trans::new(
-                                String::from("read"),
-                                String::from("P1"),
-                                always_true,
-                                move_x_to_t1,
-                            )],
-                        ),
-                        (
-                            String::from("P1"),
-                            vec![Trans::new(
-                                String::from("inc"),
-                                String::from("P2"),
-                                always_true,
-                                increment_t1,
-                            )],
-                        ),
-                        (
-                            String::from("P2"),
-                            vec![Trans::new(
-                                String::from("write"),
-                                String::from("P3"),
-                                always_true,
-                                move_t1_to_x,
-                            )],
-                        ),
-                        (String::from("P3"), vec![]),
-                    ],
-                },
-                Process {
-                    0: vec![
-                        (
-                            String::from("Q0"),
-                            vec![Trans::new(
-                                String::from("read"),
-                                String::from("Q1"),
-                                always_true,
-                                move_x_to_t2,
-                            )],
-                        ),
-                        (
-                            String::from("Q1"),
-                            vec![Trans::new(
-                                String::from("inc"),
-                                String::from("Q2"),
-                                always_true,
-                                increment_t2,
-                            )],
-                        ),
-                        (
-                            String::from("Q2"),
-                            vec![Trans::new(
-                                String::from("write"),
-                                String::from("Q3"),
-                                always_true,
-                                move_t2_to_x,
-                            )],
-                        ),
-                        (String::from("Q3"), vec![]),
-                    ],
-                },
+                Process::new(vec![
+                    (
+                        "P0",
+                        vec![Trans::new("read", "P1", always_true, move_x_to_t1)],
+                    ),
+                    (
+                        "P1",
+                        vec![Trans::new("inc", "P2", always_true, increment_t1)],
+                    ),
+                    (
+                        "P2",
+                        vec![Trans::new("write", "P3", always_true, move_t1_to_x)],
+                    ),
+                    ("P3", vec![]),
+                ]),
+                Process::new(vec![
+                    (
+                        "Q0",
+                        vec![Trans::new("read", "Q1", always_true, move_x_to_t2)],
+                    ),
+                    (
+                        "Q1",
+                        vec![Trans::new("inc", "Q2", always_true, increment_t2)],
+                    ),
+                    (
+                        "Q2",
+                        vec![Trans::new("write", "Q3", always_true, move_t2_to_x)],
+                    ),
+                    ("Q3", vec![]),
+                ]),
             ],
         );
         println!("collect_trans: {:?}", calcs);

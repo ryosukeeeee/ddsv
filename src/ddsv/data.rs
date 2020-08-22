@@ -28,10 +28,10 @@ impl<T> fmt::Debug for Trans<T> {
 }
 
 impl<T> Trans<T> {
-    pub fn new(label: String, location: String, guard: Guard<T>, action: Action<T>) -> Trans<T> {
+    pub fn new(label: &str, location: &str, guard: Guard<T>, action: Action<T>) -> Trans<T> {
         Trans {
-            label: label,
-            location: location,
+            label: String::from(label),
+            location: String::from(location),
             guard: guard,
             action: action,
         }
@@ -47,7 +47,18 @@ impl<T> fmt::Debug for Process<T> {
     }
 }
 
-impl<T> Process<T> {
+impl<T> Process<T>
+where
+    T: Clone,
+{
+    pub fn new(v: Vec<(&str, Vec<Trans<T>>)>) -> Process<T> {
+        let vv = v
+            .iter()
+            .map(move |(label, trans)| (String::from(*label), (*trans).clone()))
+            .collect::<Vec<_>>();
+        Process { 0: vv }
+    }
+
     pub fn assoc(&self, location: &str) -> Option<&Vec<Trans<T>>> {
         debug!("location: {}", location);
         for v in &self.0 {

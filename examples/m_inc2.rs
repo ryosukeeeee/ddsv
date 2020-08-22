@@ -42,30 +42,15 @@ fn main() {
         0: vec![
             (
                 String::from("P0"),
-                vec![Trans::new(
-                    String::from("read"),
-                    String::from("P1"),
-                    always_true,
-                    move_x_to_t1,
-                )],
+                vec![Trans::new("read", "P1", always_true, move_x_to_t1)],
             ),
             (
                 String::from("P1"),
-                vec![Trans::new(
-                    String::from("inc"),
-                    String::from("P2"),
-                    always_true,
-                    increment_t1,
-                )],
+                vec![Trans::new("inc", "P2", always_true, increment_t1)],
             ),
             (
                 String::from("P2"),
-                vec![Trans::new(
-                    String::from("write"),
-                    String::from("P3"),
-                    always_true,
-                    move_t1_to_x,
-                )],
+                vec![Trans::new("write", "P3", always_true, move_t1_to_x)],
             ),
             (String::from("P3"), vec![]),
         ],
@@ -75,30 +60,15 @@ fn main() {
         0: vec![
             (
                 String::from("Q0"),
-                vec![Trans::new(
-                    String::from("read"),
-                    String::from("Q1"),
-                    always_true,
-                    move_x_to_t2,
-                )],
+                vec![Trans::new("read", "Q1", always_true, move_x_to_t2)],
             ),
             (
                 String::from("Q1"),
-                vec![Trans::new(
-                    String::from("inc"),
-                    String::from("Q2"),
-                    always_true,
-                    increment_t2,
-                )],
+                vec![Trans::new("inc", "Q2", always_true, increment_t2)],
             ),
             (
                 String::from("Q2"),
-                vec![Trans::new(
-                    String::from("write"),
-                    String::from("Q3"),
-                    always_true,
-                    move_t2_to_x,
-                )],
+                vec![Trans::new("write", "Q3", always_true, move_t2_to_x)],
             ),
             (String::from("Q3"), vec![]),
         ],

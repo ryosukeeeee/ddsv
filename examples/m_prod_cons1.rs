@@ -8,18 +8,19 @@ use std::io::Write;
 #[derive(Clone, PartialEq, Eq, Hash)]
 struct SharedVars {
     mutex: i32,
-    x: i32,
-    t1: i32,
-    t2: i32,
+    cond: i32,
+    count: i32,
 }
 
+static MAX_COUNT: i32 = 3;
+static P_INDEX: i32 = 1;
+static Q_INDEX: i32 = 2;
 impl SharedVars {
     fn new() -> SharedVars {
         SharedVars {
             mutex: 0,
-            x: 0,
-            t1: 0,
-            t2: 0,
+            cond: 0,
+            count: 0,
         }
     }
 }
@@ -27,8 +28,8 @@ impl SharedVars {
 impl fmt::Debug for SharedVars {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         f.write_fmt(format_args!(
-            "m={} x={} t1={} t2={}",
-            self.mutex, self.x, self.t1, self.t2
+            "m={} cv={} cnt={}",
+            self.mutex, self.cond, self.count
         ))
     }
 }
@@ -55,21 +56,23 @@ fn main() {
             ),
             (
                 String::from("P1"),
-                vec![Trans::new("read", "P2", always_true, move_x_to_t1)],
+                vec![
+                    Trans::new("wait", "P2", can_wait_p, wait_p),
+                    Trans::new("produce", "P3", can_produce, produce),
+                ],
             ),
             (
                 String::from("P2"),
-                vec![Trans::new("inc", "P3", always_true, increment_t1)],
+                vec![Trans::new("wakeup", "P0", can_wakeup_p, wakeup)],
             ),
             (
                 String::from("P3"),
-                vec![Trans::new("write", "P4", always_true, move_t1_to_x)],
+                vec![Trans::new("signal", "P4", always_true, signal)],
             ),
             (
                 String::from("P4"),
-                vec![Trans::new("unlock", "P5", always_true, unlock)],
+                vec![Trans::new("unlock", "P0", always_true, unlock)],
             ),
-            (String::from("P5"), vec![]),
         ],
     };
 
@@ -81,76 +84,108 @@ fn main() {
             ),
             (
                 String::from("Q1"),
-                vec![Trans::new("read", "Q2", always_true, move_x_to_t2)],
+                vec![
+                    Trans::new("wait", "Q2", can_wait_q, wait_q),
+                    Trans::new("consume", "Q3", can_consume, consume),
+                ],
             ),
             (
                 String::from("Q2"),
-                vec![Trans::new("inc", "Q3", always_true, increment_t2)],
+                vec![Trans::new("wakeup", "Q0", can_wakeup_q, wakeup)],
             ),
             (
                 String::from("Q3"),
-                vec![Trans::new("write", "Q4", always_true, move_t2_to_x)],
+                vec![Trans::new("signal", "Q4", always_true, signal)],
             ),
             (
                 String::from("Q4"),
-                vec![Trans::new("unlock", "Q5", always_true, unlock)],
+                vec![Trans::new("unlock", "Q0", always_true, unlock)],
             ),
-            (String::from("Q5"), vec![]),
         ],
     };
 
-    process_p.viz_process("m_inc2_1_P");
-    process_q.viz_process("m_inc2_1_Q");
+    process_p.viz_process("m_prod_cons1_P");
+    process_q.viz_process("m_prod_cons1_Q");
     let lts = data::concurrent_composition(&r0, &vec![process_p, process_q]);
     data::lts_print_deadlock(&lts);
-    data::viz_lts("m_inc2_1", &lts);
+    data::viz_lts("m_prod_cons1", &lts);
 }
 
+// guard
 fn always_true(_r: &SharedVars) -> bool {
     true
 }
 
-fn increment_t1(r: &SharedVars) -> SharedVars {
-    let mut s = r.clone();
-    s.t1 = r.t1 + 1;
-    s
-}
-
-fn increment_t2(r: &SharedVars) -> SharedVars {
-    let mut s = r.clone();
-    s.t2 = r.t2 + 1;
-    s
-}
-fn move_t1_to_x(r: &SharedVars) -> SharedVars {
-    let mut s = r.clone();
-    s.x = r.t1;
-    s
-}
-
-fn move_t2_to_x(r: &SharedVars) -> SharedVars {
-    let mut s = r.clone();
-    s.x = r.t2;
-    s
-}
-fn move_x_to_t1(r: &SharedVars) -> SharedVars {
-    let mut s = r.clone();
-    s.t1 = r.x;
-    s
-}
-fn move_x_to_t2(r: &SharedVars) -> SharedVars {
-    let mut s = r.clone();
-    s.t2 = r.x;
-    s
-}
 fn is_locked(r: &SharedVars) -> bool {
     r.mutex == 0
 }
 
+fn can_wait_p(r: &SharedVars) -> bool {
+    r.count == MAX_COUNT
+}
+
+fn can_wait_q(r: &SharedVars) -> bool {
+    r.count == 0
+}
+
+fn can_produce(r: &SharedVars) -> bool {
+    r.count < MAX_COUNT
+}
+
+fn can_consume(r: &SharedVars) -> bool {
+    r.count > 0
+}
+
+fn can_wakeup_p(r: &SharedVars) -> bool {
+    (r.cond & P_INDEX) == 0
+}
+
+fn can_wakeup_q(r: &SharedVars) -> bool {
+    (r.cond & Q_INDEX) == 0
+}
+
+// action
 fn lock(r: &SharedVars) -> SharedVars {
     let mut s = r.clone();
     s.mutex = 1;
     s
 }
+
+fn wait_p(r: &SharedVars) -> SharedVars {
+    let mut s = r.clone();
+    s.mutex = 0;
+    s.cond = r.cond | P_INDEX;
+    s
+}
+
+fn wait_q(r: &SharedVars) -> SharedVars {
+    let mut s = r.clone();
+    s.mutex = 0;
+    s.cond = r.cond | Q_INDEX;
+    s
+}
+
+fn produce(r: &SharedVars) -> SharedVars {
+    let mut s = r.clone();
+    s.count = r.count + 1;
+    s
+}
+
+fn consume(r: &SharedVars) -> SharedVars {
+    let mut s = r.clone();
+    s.count = r.count - 1;
+    s
+}
+fn wakeup(r: &SharedVars) -> SharedVars {
+    r.clone()
+}
+
+fn signal(r: &SharedVars) -> SharedVars {
+    let mut s = r.clone();
+    s.cond = r.cond & (r.cond - 1);
+    s
+}
+
 fn unlock(r: &SharedVars) -> SharedVars {
     let mut s = r.clone();
     s.mutex = 0;
