@@ -135,7 +135,7 @@ where
             // t = ("read", (遷移後の共有変数, (s1, s2, ..., sn)))
             let t = (String::from(label), target);
             let mut acc__ = acc_.clone();
-            acc__.push(t);
+            acc__.insert(0, t);
             acc__
         } else {
             acc_
