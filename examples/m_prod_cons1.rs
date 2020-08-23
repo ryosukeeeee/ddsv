@@ -15,6 +15,7 @@ struct SharedVars {
 static MAX_COUNT: i32 = 3;
 static P_INDEX: i32 = 1;
 static Q_INDEX: i32 = 2;
+
 impl SharedVars {
     fn new() -> SharedVars {
         SharedVars {

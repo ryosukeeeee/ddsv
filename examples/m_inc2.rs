@@ -80,10 +80,12 @@ fn main() {
     data::viz_lts("m_inc2", &lts);
 }
 
+// guard
 fn always_true(_r: &SharedVars) -> bool {
     true
 }
 
+// action
 fn increment_t1(r: &SharedVars) -> SharedVars {
     let mut s = r.clone();
     s.t1 = r.t1 + 1;
@@ -95,6 +97,7 @@ fn increment_t2(r: &SharedVars) -> SharedVars {
     s.t2 = r.t2 + 1;
     s
 }
+
 fn move_t1_to_x(r: &SharedVars) -> SharedVars {
     let mut s = r.clone();
     s.x = r.t1;
@@ -106,11 +109,13 @@ fn move_t2_to_x(r: &SharedVars) -> SharedVars {
     s.x = r.t2;
     s
 }
+
 fn move_x_to_t1(r: &SharedVars) -> SharedVars {
     let mut s = r.clone();
     s.t1 = r.x;
     s
 }
+
 fn move_x_to_t2(r: &SharedVars) -> SharedVars {
     let mut s = r.clone();
     s.t2 = r.x;
