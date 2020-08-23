@@ -60,11 +60,8 @@ where
     }
 
     pub fn assoc(&self, location: &str) -> Option<&Vec<Trans<T>>> {
-        debug!("location: {}", location);
         for v in &self.0 {
-            debug!("assoc: {:?}", v);
             if v.0 == location {
-                debug!("  found: {:?}", v);
                 return Some(v.1.as_ref());
             }
         }
@@ -106,6 +103,7 @@ where
             .arg(format!("{}.dot", filename))
             .spawn()
             .expect("failed to visualize");
+        debug!("succeed to output PDF");
     }
 }
 
@@ -137,10 +135,6 @@ where
             let mut locations = rs.to_vec(); // rs = (sk-1, sk-2, ..., s2, s1)
             locations.reverse();
             locations.append(&mut v1);
-            debug!(
-                "  rs: {:?},\n  ls: {:?},\n  locations: {:?}",
-                rs, ls, locations
-            );
             // target = (遷移後の共有変数, (s1, s2, ..., sn))
             let target = ((trans.action)(&r), locations);
             // t = ("read", (遷移後の共有変数, (s1, s2, ..., sn)))
@@ -166,13 +160,8 @@ where
     T: Debug + Clone,
 {
     match (ls, ps) {
-        ([], []) => {
-            debug!("collect_trans: {:?}", acc);
-            acc
-        }
+        ([], []) => acc,
         (l, p) => {
-            debug!("ps: {:?}", ps);
-            debug!("ls: {:?}", ls);
             let (location, ls_2) = l.split_first().unwrap();
             let (process, ps_2) = p.split_first().unwrap();
             let transitions = process.assoc(&location).unwrap();
@@ -220,11 +209,7 @@ where
 
     while !que.is_empty() {
         let (state, id, path) = que.pop_back().unwrap();
-        debug!("==================");
-        debug!("state: {:?}, id: {}, \npath: {:?}", state, id, path);
-        debug!("==================");
         let trans = (next)(state.clone());
-        // trans.reverse();
         if trans.is_empty() {
             deadlocks.push(path.clone());
         }
