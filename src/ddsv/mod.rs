@@ -152,7 +152,6 @@ mod tests {
         r1.t1 = 1;
         assert_eq!((next[0].1).0, r1);
         assert_eq!((next[0].1).1, vec!["P1", "Q3", "Q1"]);
-        println!("next[0]: {:?}", next[0]);
     }
 
     #[test]
@@ -196,6 +195,12 @@ mod tests {
                 ]),
             ],
         );
-        println!("collect_trans: {:?}", calcs);
+        assert_eq!(calcs.len(), 2);
+        assert_eq!(calcs[0].0, "read");
+        assert_eq!((calcs[0].1).0, SharedVars::new());
+        assert_eq!((calcs[0].1).1, ["P0", "Q1"]);
+        assert_eq!(calcs[1].0, "read");
+        assert_eq!((calcs[1].1).0, SharedVars::new());
+        assert_eq!((calcs[1].1).1, ["P1", "Q0"]);
     }
 }
