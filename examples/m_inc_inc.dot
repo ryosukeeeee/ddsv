@@ -1,0 +1,13 @@
+digraph{
+4 [label="4\nP4 \nx=4",];
+0 [label="0\nP0 \nx=0",style=filled,fillcolor=cyan];
+2 [label="2\nP2 \nx=2",];
+1 [label="1\nP1 \nx=1",];
+3 [label="3\nP3 \nx=3",];
+5 [label="5\nP5 \nx=5",style=filled,fillcolor=pink];
+4 -> 5 [label="inc"];
+0 -> 1 [label="inc"];
+2 -> 3 [label="inc"];
+1 -> 2 [label="inc"];
+3 -> 4 [label="inc"];
+}

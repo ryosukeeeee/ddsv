@@ -1,0 +1,13 @@
+digraph {
+P0;
+P1;
+P2;
+P3;
+P4;
+P5;
+P0 -> P1 [label="inc"];
+P1 -> P2 [label="inc"];
+P2 -> P3 [label="inc"];
+P3 -> P4 [label="inc"];
+P4 -> P5 [label="inc"];
+}

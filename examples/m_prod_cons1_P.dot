@@ -1,0 +1,13 @@
+digraph {
+P0;
+P1;
+P2;
+P3;
+P4;
+P0 -> P1 [label="lock"];
+P1 -> P2 [label="wait"];
+P1 -> P3 [label="produce"];
+P2 -> P0 [label="wakeup"];
+P3 -> P4 [label="signal"];
+P4 -> P0 [label="unlock"];
+}

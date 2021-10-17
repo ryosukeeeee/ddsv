@@ -1,0 +1,13 @@
+digraph {
+Q0;
+Q1;
+Q2;
+Q3;
+Q4;
+Q0 -> Q1 [label="lock"];
+Q1 -> Q2 [label="wait"];
+Q1 -> Q3 [label="consume"];
+Q2 -> Q0 [label="wakeup"];
+Q3 -> Q4 [label="signal"];
+Q4 -> Q0 [label="unlock"];
+}
