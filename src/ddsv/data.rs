@@ -8,17 +8,12 @@ use std::hash::Hash;
 use std::io::{stdout, BufWriter, Write};
 use std::process::Command;
 
-use super::{Action, Guard, Label, Location, Path, State};
+use super::{Label, Location, Path, Process, State, Trans};
 
-#[derive(Clone)]
-pub struct Trans<T> {
-    pub label: Label,
-    pub location: Location,
-    pub guard: Guard<T>,
-    pub action: Action<T>,
-}
-
-impl<T> fmt::Debug for Trans<T> {
+impl<T> fmt::Debug for Trans<T>
+where
+    T: Clone,
+{
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         f.debug_struct("Trans")
             .field("label", &self.label)
@@ -27,73 +22,46 @@ impl<T> fmt::Debug for Trans<T> {
     }
 }
 
-impl<T> Trans<T> {
-    pub fn new(label: &str, location: &str, guard: Guard<T>, action: Action<T>) -> Trans<T> {
-        Trans {
-            label: String::from(label),
-            location: String::from(location),
-            guard: guard,
-            action: action,
-        }
-    }
+pub trait Visualize<T: Clone> {
+    fn assoc(&self, location: &str) -> Option<&Vec<Trans<T>>>;
+    fn viz_process(&self, filename: &str);
 }
 
-#[derive(Clone)]
-pub struct Process<T>(pub Vec<(Location, Vec<Trans<T>>)>);
-
-impl<T> fmt::Debug for Process<T> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        f.debug_list().entries(self.0.iter()).finish()
-    }
-}
-
-impl<T> Process<T>
+impl<T> Visualize<T> for Process<T>
 where
     T: Clone,
 {
-    pub fn new(v: Vec<(&str, Vec<Trans<T>>)>) -> Process<T> {
-        let vv = v
-            .iter()
-            .map(move |(label, trans)| (String::from(*label), (*trans).clone()))
-            .collect::<Vec<_>>();
-        Process { 0: vv }
-    }
-
-    pub fn assoc(&self, location: &str) -> Option<&Vec<Trans<T>>> {
-        for v in &self.0 {
+    // ラベル（location）を受け取り、状態遷移の配列から、
+    // ラベルが一致する遷移の配列があったら、それへの参照を返す。
+    // ラベルが一致する遷移の配列がなければNoneを返す
+    fn assoc(&self, location: &str) -> Option<&Vec<Trans<T>>> {
+        for v in self {
             if v.0 == location {
                 return Some(v.1.as_ref());
             }
         }
         None
     }
-    pub fn viz_process(&self, filename: &str) {
+
+    fn viz_process(&self, filename: &str) {
         let mut f = BufWriter::new(fs::File::create(format!("{}.dot", filename)).unwrap());
-        f.write("digraph {\n".as_bytes()).unwrap();
+        f.write_all("digraph {\n".as_bytes()).unwrap();
 
-        &self
-            .0
-            .iter()
-            .map(|v| {
-                f.write(format!("{};\n", v.0.to_string()).as_bytes())
-                    .unwrap();
-            })
-            .collect::<Vec<_>>();
+        for p in self {
+            f.write_all(format!("{};\n", p.0.to_string()).as_bytes())
+                .unwrap();
+        }
 
-        &self
-            .0
-            .iter()
-            .map(|v| {
-                v.1.iter().for_each(|trans| {
-                    let target = &trans.location;
-                    let label = &trans.label;
-                    let line = format!("{} -> {} [label=\"{}\"];\n", &v.0, &target, &label);
-                    f.write(&line.as_bytes()).unwrap();
-                });
-            })
-            .collect::<Vec<_>>();
+        for p in self {
+            p.1.iter().for_each(|trans| {
+                let target = &trans.location;
+                let label = &trans.label;
+                let line = format!("{} -> {} [label=\"{}\"];\n", &p.0, &target, &label);
+                f.write_all(&line.as_bytes()).unwrap();
+            });
+        }
 
-        f.write("}\n".as_bytes()).unwrap();
+        f.write_all("}\n".as_bytes()).unwrap();
 
         Command::new("dot")
             .arg("-T")
@@ -107,81 +75,70 @@ where
     }
 }
 
-pub fn make_initial_state<T>(r0: &T, ps: &[Process<T>]) -> State<T>
+// 最初の共有変数と、プロセスのリストを受け取って状態を返す
+pub fn make_initial_state<T>(r0: T, ps: &[Process<T>]) -> State<T>
 where
     T: Clone,
 {
-    let v = ps.iter().map(|p| p.0[0].0.clone()).collect::<Vec<String>>();
-    (r0.clone(), v)
-}
-
-pub fn calc_transitions<T>(
-    acc: Vec<(Label, State<T>)>,
-    r: &T,
-    rs: &[Location],
-    ls: &[Location],
-    transitions: &[Trans<T>],
-) -> Vec<(Label, State<T>)>
-where
-    T: Clone,
-{
-    let tmp = transitions.iter().fold(acc, |acc_, trans| {
-        if (trans.guard)(&r) {
-            // guardが成立 => 遷移可能
-            let label = &trans.label; // label = "read"
-            let mut v1 = ls.to_vec(); // ls = (sk, sk+1, ..., sn)
-            v1.insert(0, trans.location.clone()); // location = P1
-
-            let mut locations = rs.to_vec(); // rs = (sk-1, sk-2, ..., s2, s1)
-            locations.reverse();
-            locations.append(&mut v1);
-            // target = (遷移後の共有変数, (s1, s2, ..., sn))
-            let target = ((trans.action)(&r), locations);
-            // t = ("read", (遷移後の共有変数, (s1, s2, ..., sn)))
-            let t = (String::from(label), target);
-            let mut acc__ = acc_.clone();
-            acc__.insert(0, t);
-            acc__
-        } else {
-            acc_
-        }
-    });
-    tmp
+    let mut v = Vec::new();
+    for process in ps {
+        let first = process.first().expect("Empty process is prohobited");
+        v.push(first.0.clone())
+    }
+    (r0, v)
 }
 
 pub fn collect_trans<T>(
-    acc: Vec<(Label, State<T>)>,
-    r: &T,
-    rs: &[Location], // (sk-1, sk-2, ..., s2, s1)
-    ls: &[Location], // (sk, sk+1, ..., sn)
-    ps: &[Process<T>],
+    r: &T,             // 共有変数
+    locs: &[Location], // ex. [P1, Q0]
+    ps: &[Process<T>], // プロセスの配列
 ) -> Vec<(Label, State<T>)>
 where
     T: Debug + Clone,
 {
-    match (ls, ps) {
-        ([], []) => acc,
-        (l, p) => {
-            let (location, ls_2) = l.split_first().unwrap();
-            let (process, ps_2) = p.split_first().unwrap();
-            let transitions = process.assoc(&location).unwrap();
-            let acc = calc_transitions(acc, r, rs, ls_2, transitions);
-            let mut rs_2 = vec![location.clone()];
-            rs_2.extend(rs.to_vec());
-            return collect_trans(acc, r, rs_2.as_slice(), ls_2, ps_2);
+    // lsが未処理、初期値は空リスト
+    // rsが処理済み、初期値は各プロセスの
+    let mut result: Vec<(Label, State<T>)> = Vec::new();
+    for i in 0..locs.len() {
+        let process = &ps[i];
+        let location = &locs[i];
+
+        let transitions = process.assoc(location).unwrap();
+        let out: Vec<(Label, Location, T)> = calc_transitions(r, transitions);
+        for tuple in out {
+            let mut locations = locs.to_vec();
+            locations[i] = tuple.1;
+            result.push((tuple.0, (tuple.2, locations)));
         }
     }
+    result
 }
 
+pub fn calc_transitions<T>(r: &T, transitions: &[Trans<T>]) -> Vec<(Label, Location, T)>
+where
+    T: Clone,
+{
+    let mut result: Vec<(Label, Location, T)> = Vec::new();
+    for trans in transitions {
+        if (trans.guard)(&r) {
+            let label = trans.label.clone(); // ex. "read"
+            let location = trans.location.clone(); // ex. "P1"
+            let r_transed = (trans.action)(&r); // 遷移後の共有変数
+            result.push((label, location, r_transed));
+        }
+    }
+    result
+}
+// 状態（共有変数と各スレッドの状態）を渡すと、遷移可能なラベル（ex. read）とそのときの遷移先の状態を配列にして返す関数を計算する関数
 pub fn make_next_function<T>(ps: Vec<Process<T>>) -> Box<dyn Fn(State<T>) -> Vec<(Label, State<T>)>>
 where
     T: Debug + Clone + 'static,
 {
-    Box::new(move |(r, locs)| return collect_trans(vec![], &r, &[], locs.as_slice(), ps.as_slice()))
+    Box::new(move |(r, locs)| collect_trans(&r, &locs, &ps))
 }
 
 pub fn concurrent_composition<T>(
-    r0: &T,
+    r0: T,
     ps: &[Process<T>],
 ) -> (HashMap<State<T>, (i32, Path<T>)>, Vec<Path<T>>)
 where
@@ -246,16 +203,16 @@ where
     let out = stdout();
     let mut out = BufWriter::new(out.lock());
     for (i, dl) in deadlock.iter().enumerate() {
-        out.write(format!("{} {:010} {:?} ", i, dl.0, (dl.1).0).as_bytes())
+        out.write_all(format!("{} {:010} {:?} ", i, dl.0, (dl.1).0).as_bytes())
             .unwrap();
         print_locations(&mut out, (dl.1).1.as_slice());
-        out.write("\n".as_bytes()).unwrap();
+        out.write_all("\n".as_bytes()).unwrap();
     }
 }
 
 pub fn print_locations(ch: &mut dyn Write, locations: &[Location]) {
     for l in locations {
-        ch.write(format!("{} ", l).as_bytes()).unwrap();
+        ch.write_all(format!("{} ", l).as_bytes()).unwrap();
     }
 }
 
@@ -265,10 +222,10 @@ where
 {
     let (ht, _) = lts;
     let mut f = BufWriter::new(fs::File::create(format!("{}.dot", filename)).unwrap());
-    f.write("digraph{\n".as_bytes()).unwrap();
+    f.write_all("digraph{\n".as_bytes()).unwrap();
     emit_states(&mut f, &ht);
     emit_transitions(&mut f, &ht);
-    f.write("}\n".as_bytes()).unwrap();
+    f.write_all("}\n".as_bytes()).unwrap();
 
     Command::new("dot")
         .arg("-T")
@@ -285,16 +242,18 @@ where
     T: Debug,
 {
     for ((r, locs), (id, trans)) in hm.iter() {
-        ch.write(format!("{} [label=\"{}\\n", id, id).as_bytes())
+        ch.write_all(format!("{} [label=\"{}\\n", id, id).as_bytes())
             .unwrap();
         print_locations(ch, locs);
-        ch.write(format!("\\n{:?}\",", r).as_bytes()).unwrap();
+        ch.write_all(format!("\\n{:?}\",", r).as_bytes()).unwrap();
         if *id == 0 {
-            ch.write("style=filled,fillcolor=cyan".as_bytes()).unwrap();
-        } else if trans.len() == 0 {
-            ch.write("style=filled,fillcolor=pink".as_bytes()).unwrap();
+            ch.write_all("style=filled,fillcolor=cyan".as_bytes())
+                .unwrap();
+        } else if trans.is_empty() {
+            ch.write_all("style=filled,fillcolor=pink".as_bytes())
+                .unwrap();
         }
-        ch.write("];\n".as_bytes()).unwrap();
+        ch.write_all("];\n".as_bytes()).unwrap();
     }
 }
 
@@ -305,7 +264,7 @@ where
     for (_key, (id, trans)) in hm.iter() {
         for (label, target) in trans {
             let (tid, _) = hm.get(target).unwrap();
-            ch.write(format!("{} -> {} [label=\"{}\"];\n", id, tid, label).as_bytes())
+            ch.write_all(format!("{} -> {} [label=\"{}\"];\n", id, tid, label).as_bytes())
                 .unwrap();
         }
     }

@@ -1,17 +1,83 @@
+use std::rc::Rc;
+
 pub mod data;
 
-type Guard<T> = fn(&T) -> bool;
-type Action<T> = fn(&T) -> T;
-type Label = String;
-type Location = String;
-type State<T> = (T, Vec<Location>);
-type Path<T> = Vec<(Label, State<T>)>;
+// ラベル（ex. read）
+pub type Label = String;
+// ロケーション（ex. P1）
+pub type Location = String;
+// 状態は共有変数とロケーションの配列（各スレッドの状態）から成る
+pub type State<T> = (T, Vec<Location>);
+pub type Path<T> = Vec<(Label, State<T>)>;
+
+// 状態遷移（プロセス）はロケーション（ex. P1）と遷移リストをタプル要素としてもつリスト
+pub type Process<T> = Vec<(Location, Vec<Trans<T>>)>;
+
+// ある状態から遷移の可能性を表す
+#[derive(Clone)]
+pub struct Trans<T: Clone> {
+    pub label: Label,
+    pub location: Location,
+    pub guard: Rc<dyn Fn(&T) -> bool>,
+    pub action: Rc<dyn Fn(&T) -> T>,
+}
+
+macro_rules! trans {
+    ($t:ty, [$($tuple: expr),*]) => {{
+        let mut t: Vec<$crate::ddsv::Trans<$t>> = Vec::new();
+        $(
+            let trans = $crate::ddsv::Trans {
+                label: String::from($tuple.0),
+                location: String::from($tuple.1),
+                guard: Rc::new($tuple.2),
+                action: Rc::new($tuple.3),
+            };
+            t.push(trans);
+        )*
+        t
+    }};
+}
+
+#[macro_export]
+macro_rules! process {
+    ($t:ty,[
+        $(
+            (
+                $loc:expr, [
+                    $($tuple: expr),*
+                ]
+            )
+        ),*
+    ]
+    ) => {
+        {
+            let mut p: $crate::ddsv::Process<$t> = Vec::new();
+            $(
+                let location = String::from($loc);
+                let mut t: Vec<$crate::ddsv::Trans<$t>> = Vec::new();
+                $(
+                    let trans = $crate::ddsv::Trans {
+                        label: String::from($tuple.0),
+                        location: String::from($tuple.1),
+                        guard: Rc::new($tuple.2),
+                        action: Rc::new($tuple.3)
+                    };
+                    t.push(trans);
+                )*
+                p.push((location, t));
+            )*
+            p
+        }
+    };
+}
 
 #[cfg(test)]
 mod tests {
     use super::data::*;
+    use crate::ddsv::Trans;
     use env_logger;
     use std::env;
+    use std::rc::Rc;
     #[derive(Clone, Eq, Hash)]
     struct SharedVars {
         x: i32,
@@ -41,166 +107,311 @@ mod tests {
         env_logger::init();
     }
 
-    fn always_true(_r: &SharedVars) -> bool {
-        true
-    }
-    fn return_copied(r: &SharedVars) -> SharedVars {
-        r.clone()
-    }
-
-    fn increment_t1(r: &SharedVars) -> SharedVars {
-        let mut s = r.clone();
-        s.t1 = r.t1 + 1;
-        s
-    }
-
-    fn increment_t2(r: &SharedVars) -> SharedVars {
-        let mut s = r.clone();
-        s.t2 = r.t2 + 1;
-        s
-    }
-    fn move_t1_to_x(r: &SharedVars) -> SharedVars {
-        let mut s = r.clone();
-        s.x = r.t1;
-        s
-    }
-
-    fn move_t2_to_x(r: &SharedVars) -> SharedVars {
-        let mut s = r.clone();
-        s.x = r.t2;
-        s
-    }
-    fn move_x_to_t1(r: &SharedVars) -> SharedVars {
-        let mut s = r.clone();
-        s.t1 = r.x;
-        s
-    }
-    fn move_x_to_t2(r: &SharedVars) -> SharedVars {
-        let mut s = r.clone();
-        s.t2 = r.x;
-        s
-    }
-    #[test]
-    fn trans_test() {
-        let t = Trans::new("read", "P1", always_true, return_copied);
-        assert_eq!(t.label, String::from("read"));
-        assert_eq!(t.location, String::from("P1"));
-        assert_eq!((t.guard)(&SharedVars::new()), true);
-        assert_eq!((t.action)(&SharedVars::new()), SharedVars::new());
-    }
     #[test]
     fn trans_print_test() {
-        let t = Trans::new("read", "P1", always_true, return_copied);
+        let mut t: Vec<Trans<SharedVars>> = Vec::new();
+
+        let trans = Trans {
+            label: String::from("read"),
+            location: String::from("P1"),
+            guard: Rc::new(|_: &SharedVars| true),
+            action: Rc::new(|r: &SharedVars| r.clone()),
+        };
+        t.push(trans);
         assert_eq!(
             format!("{:?}", t),
-            "Trans { label: \"read\", location: \"P1\" }"
+            "[Trans { label: \"read\", location: \"P1\" }]"
+        );
+    }
+
+    #[test]
+    fn trans_macro_test() {
+        let t = trans![
+            SharedVars,
+            [
+                (
+                    "read",
+                    "P1",
+                    |_: &SharedVars| true,
+                    |r: &SharedVars| r.clone()
+                ),
+                (
+                    "write",
+                    "P2",
+                    |_: &SharedVars| true,
+                    |r: &SharedVars| r.clone()
+                )
+            ]
+        ];
+
+        assert_eq!(
+            format!("{:?}", t),
+            "[Trans { label: \"read\", location: \"P1\" }, Trans { label: \"write\", location: \"P2\" }]"
+        );
+    }
+
+    #[test]
+    fn trans_macro_process_test() {
+        let t = process![
+            SharedVars,
+            [
+                (
+                    "Q0",
+                    [(
+                        "read",
+                        "P1",
+                        |_: &SharedVars| true,
+                        |r: &SharedVars| r.clone()
+                    )]
+                ),
+                (
+                    "Q1",
+                    [(
+                        "write",
+                        "P2",
+                        |_: &SharedVars| true,
+                        |r: &SharedVars| r.clone()
+                    )]
+                )
+            ]
+        ];
+
+        assert_eq!(
+            format!("{:?}", t),
+            "[(\"Q0\", [Trans { label: \"read\", location: \"P1\" }]), (\"Q1\", [Trans { label: \"write\", location: \"P2\" }])]"
         );
     }
 
     #[test]
     fn process_test() {
         let r0 = SharedVars::new();
-        let process_p = Process::new(vec![
-            (
-                "P0",
-                vec![Trans::new("read", "P1", always_true, move_x_to_t1)],
-            ),
-            (
-                "P1",
-                vec![Trans::new("inc", "P2", always_true, increment_t1)],
-            ),
-            (
-                "P2",
-                vec![Trans::new("write", "P3", always_true, move_t1_to_x)],
-            ),
-            ("P3", vec![]),
-        ]);
-        let process_q = Process::new(vec![
-            (
-                "Q0",
-                vec![Trans::new("read", "Q1", always_true, move_x_to_t2)],
-            ),
-            (
-                "Q1",
-                vec![Trans::new("inc", "Q2", always_true, increment_t2)],
-            ),
-            (
-                "Q2",
-                vec![Trans::new("write", "Q3", always_true, move_t2_to_x)],
-            ),
-            ("Q3", vec![]),
-        ]);
-        let v = make_initial_state(&r0, &vec![process_p, process_q]);
-        assert_eq!(v.0, r0.clone());
+
+        let process_p = process![
+            SharedVars,
+            [
+                (
+                    "P0",
+                    [(
+                        "read",
+                        "P1",
+                        |_: &SharedVars| true,
+                        |r: &SharedVars| {
+                            let mut s = r.clone();
+                            s.t1 = r.x;
+                            s
+                        }
+                    )]
+                ),
+                (
+                    "P1",
+                    [(
+                        "inc",
+                        "P2",
+                        |_: &SharedVars| true,
+                        |r: &SharedVars| {
+                            let mut s = r.clone();
+                            s.t1 = r.t1 + 1;
+                            s
+                        }
+                    )]
+                ),
+                (
+                    "P2",
+                    [(
+                        "write",
+                        "P3",
+                        |_: &SharedVars| true,
+                        |r: &SharedVars| {
+                            let mut s = r.clone();
+                            s.x = r.t1;
+                            s
+                        }
+                    )]
+                ),
+                ("P3", [])
+            ]
+        ];
+        let process_q = process![
+            SharedVars,
+            [
+                (
+                    "Q0",
+                    [(
+                        "read",
+                        "Q1",
+                        |_: &SharedVars| true,
+                        |r: &SharedVars| {
+                            let mut s = r.clone();
+                            s.t2 = r.x;
+                            s
+                        }
+                    )]
+                ),
+                (
+                    "Q1",
+                    [(
+                        "inc",
+                        "Q2",
+                        |_: &SharedVars| true,
+                        |r: &SharedVars| {
+                            let mut s = r.clone();
+                            s.t2 = r.t2 + 1;
+                            s
+                        }
+                    )]
+                ),
+                (
+                    "Q2",
+                    [(
+                        "write",
+                        "Q3",
+                        |_: &SharedVars| true,
+                        |r: &SharedVars| {
+                            let mut s = r.clone();
+                            s.x = r.t2;
+                            s
+                        }
+                    )]
+                ),
+                ("Q3", [])
+            ]
+        ];
+        let r1 = r0.clone();
+        let v = make_initial_state(r0, &[process_p, process_q]);
+        assert_eq!(v.0, r1);
         assert_eq!(v.1[0], "P0");
         assert_eq!(v.1[1], "Q0");
     }
 
     #[test]
     fn calc_transitions_test() {
-        let r0 = SharedVars::new();
-        let next = calc_transitions(
-            vec![],
-            &r0,
-            &[String::from("P1")],
-            &[String::from("Q1")],
-            &[Trans::new("write", "Q3", always_true, increment_t1)],
-        );
+        let mut r0 = SharedVars::new();
+        let trans = trans![
+            SharedVars,
+            [(
+                "write",
+                "Q3",
+                |_: &SharedVars| true,
+                |r: &SharedVars| {
+                    let mut s = r.clone();
+                    s.t1 = r.t1 + 1;
+                    s
+                }
+            )]
+        ];
+
+        let next = calc_transitions(&r0, &trans);
         assert_eq!(next.len(), 1);
         assert_eq!(next[0].0, "write");
-        let mut r1 = r0.clone();
-        r1.t1 = 1;
-        assert_eq!((next[0].1).0, r1);
-        assert_eq!((next[0].1).1, vec!["P1", "Q3", "Q1"]);
+        assert_eq!(next[0].1, "Q3");
+        r0.t1 = 1;
+        assert_eq!(next[0].2, r0);
     }
 
     #[test]
     fn collect_trans_test() {
         init();
-        let calcs = collect_trans(
-            vec![],
-            &SharedVars::new(),
-            &[],
-            &[String::from("P0"), String::from("Q0")],
-            &vec![
-                Process::new(vec![
-                    (
-                        "P0",
-                        vec![Trans::new("read", "P1", always_true, move_x_to_t1)],
-                    ),
-                    (
+        let process_p = process![
+            SharedVars,
+            [
+                (
+                    "P0",
+                    [(
+                        "read_p",
                         "P1",
-                        vec![Trans::new("inc", "P2", always_true, increment_t1)],
-                    ),
-                    (
+                        |_: &SharedVars| true,
+                        |r: &SharedVars| {
+                            let mut s = r.clone();
+                            s.t1 = r.x;
+                            s
+                        }
+                    )]
+                ),
+                (
+                    "P1",
+                    [(
+                        "inc",
                         "P2",
-                        vec![Trans::new("write", "P3", always_true, move_t1_to_x)],
-                    ),
-                    ("P3", vec![]),
-                ]),
-                Process::new(vec![
-                    (
-                        "Q0",
-                        vec![Trans::new("read", "Q1", always_true, move_x_to_t2)],
-                    ),
-                    (
+                        |_: &SharedVars| true,
+                        |r: &SharedVars| {
+                            let mut s = r.clone();
+                            s.t1 = r.t1 + 1;
+                            s
+                        }
+                    )]
+                ),
+                (
+                    "P2",
+                    [(
+                        "write",
+                        "P3",
+                        |_: &SharedVars| true,
+                        |r: &SharedVars| {
+                            let mut s = r.clone();
+                            s.x = r.t1;
+                            s
+                        }
+                    )]
+                ),
+                ("P3", [])
+            ]
+        ];
+        let process_q = process![
+            SharedVars,
+            [
+                (
+                    "Q0",
+                    [(
+                        "read_q",
                         "Q1",
-                        vec![Trans::new("inc", "Q2", always_true, increment_t2)],
-                    ),
-                    (
+                        |_: &SharedVars| true,
+                        |r: &SharedVars| {
+                            let mut s = r.clone();
+                            s.t2 = r.x;
+                            s
+                        }
+                    )]
+                ),
+                (
+                    "Q1",
+                    [(
+                        "inc",
                         "Q2",
-                        vec![Trans::new("write", "Q3", always_true, move_t2_to_x)],
-                    ),
-                    ("Q3", vec![]),
-                ]),
-            ],
+                        |_: &SharedVars| true,
+                        |r: &SharedVars| {
+                            let mut s = r.clone();
+                            s.t2 = r.t2 + 1;
+                            s
+                        }
+                    )]
+                ),
+                (
+                    "Q2",
+                    [(
+                        "write",
+                        "Q3",
+                        |_: &SharedVars| true,
+                        |r: &SharedVars| {
+                            let mut s = r.clone();
+                            s.x = r.t2;
+                            s
+                        }
+                    )]
+                ),
+                ("Q3", [])
+            ]
+        ];
+        let calcs = collect_trans(
+            &SharedVars::new(),
+            &[String::from("P0"), String::from("Q0")],
+            &[process_p, process_q],
         );
         assert_eq!(calcs.len(), 2);
-        assert_eq!(calcs[0].0, "read");
+        assert_eq!(calcs[0].0, "read_p");
         assert_eq!((calcs[0].1).0, SharedVars::new());
-        assert_eq!((calcs[0].1).1, ["P0", "Q1"]);
-        assert_eq!(calcs[1].0, "read");
+        assert_eq!((calcs[0].1).1, ["P1", "Q0"]);
+        assert_eq!(calcs[1].0, "read_q");
         assert_eq!((calcs[1].1).0, SharedVars::new());
-        assert_eq!((calcs[1].1).1, ["P1", "Q0"]);
+        assert_eq!((calcs[1].1).1, ["P0", "Q1"]);
     }
 }
