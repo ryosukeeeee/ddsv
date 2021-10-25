@@ -1,9 +1,11 @@
 use ddsv::data;
-use ddsv::data::{Process, Trans};
-use env_logger;
+use ddsv::data::Visualize;
+use ddsv::ddsv::Process;
+use ddsv::process;
 use std::env;
 use std::fmt;
 use std::io::Write;
+use std::rc::Rc;
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 struct SharedVars {
@@ -47,119 +49,153 @@ fn main() {
         })
         .init();
     let r0 = SharedVars::new();
-    let process_p = Process {
-        0: vec![
+    let process_p: Process<SharedVars> = process![
+        SharedVars,
+        [
             (
-                String::from("P0"),
-                vec![Trans::new("lock", "P1", is_locked, lock)],
+                "P0",
+                [(
+                    "lock",
+                    "P1",
+                    |r: &SharedVars| r.mutex == 0,
+                    |r: &SharedVars| {
+                        let mut s = r.clone();
+                        s.mutex = 1;
+                        s
+                    }
+                )]
             ),
             (
-                String::from("P1"),
-                vec![Trans::new("read", "P2", always_true, move_x_to_t1)],
+                "P1",
+                [(
+                    "read",
+                    "P2",
+                    |_: &SharedVars| true,
+                    |r: &SharedVars| {
+                        let mut s = r.clone();
+                        s.t1 = r.x;
+                        s
+                    }
+                )]
             ),
             (
-                String::from("P2"),
-                vec![Trans::new("inc", "P3", always_true, increment_t1)],
+                "P2",
+                [(
+                    "inc",
+                    "P3",
+                    |_: &SharedVars| true,
+                    |r: &SharedVars| {
+                        let mut s = r.clone();
+                        s.t1 = r.t1 + 1;
+                        s
+                    }
+                )]
             ),
             (
-                String::from("P3"),
-                vec![Trans::new("write", "P4", always_true, move_t1_to_x)],
+                "P3",
+                [(
+                    "write",
+                    "P4",
+                    |_: &SharedVars| true,
+                    |r: &SharedVars| {
+                        let mut s = r.clone();
+                        s.x = r.t1;
+                        s
+                    }
+                )]
             ),
             (
-                String::from("P4"),
-                vec![Trans::new("unlock", "P5", always_true, unlock)],
+                "P4",
+                [(
+                    "unlock",
+                    "P5",
+                    |_: &SharedVars| true,
+                    |r: &SharedVars| {
+                        let mut s = r.clone();
+                        s.mutex = 0;
+                        s
+                    }
+                )]
             ),
-            (String::from("P5"), vec![]),
-        ],
-    };
+            ("P5", [])
+        ]
+    ];
 
-    let process_q = Process {
-        0: vec![
+    let process_q: Process<SharedVars> = process![
+        SharedVars,
+        [
             (
-                String::from("Q0"),
-                vec![Trans::new("lock", "Q1", is_locked, lock)],
+                "Q0",
+                [(
+                    "lock",
+                    "Q1",
+                    |r: &SharedVars| r.mutex == 0,
+                    |r: &SharedVars| {
+                        let mut s = r.clone();
+                        s.mutex = 1;
+                        s
+                    }
+                )]
             ),
             (
-                String::from("Q1"),
-                vec![Trans::new("read", "Q2", always_true, move_x_to_t2)],
+                "Q1",
+                [(
+                    "read",
+                    "Q2",
+                    |_: &SharedVars| true,
+                    |r: &SharedVars| {
+                        let mut s = r.clone();
+                        s.t2 = r.x;
+                        s
+                    }
+                )]
             ),
             (
-                String::from("Q2"),
-                vec![Trans::new("inc", "Q3", always_true, increment_t2)],
+                "Q2",
+                [(
+                    "inc",
+                    "Q3",
+                    |_: &SharedVars| true,
+                    |r: &SharedVars| {
+                        let mut s = r.clone();
+                        s.t2 = r.t2 + 1;
+                        s
+                    }
+                )]
             ),
             (
-                String::from("Q3"),
-                vec![Trans::new("write", "Q4", always_true, move_t2_to_x)],
+                "Q3",
+                [(
+                    "write",
+                    "Q4",
+                    |_: &SharedVars| true,
+                    |r: &SharedVars| {
+                        let mut s = r.clone();
+                        s.x = r.t2;
+                        s
+                    }
+                )]
             ),
             (
-                String::from("Q4"),
-                vec![Trans::new("unlock", "Q5", always_true, unlock)],
+                "Q4",
+                [(
+                    "unlock",
+                    "Q5",
+                    |_: &SharedVars| true,
+                    |r: &SharedVars| {
+                        let mut s = r.clone();
+                        s.mutex = 0;
+                        s
+                    }
+                )]
             ),
-            (String::from("Q5"), vec![]),
-        ],
-    };
+            ("Q5", [])
+        ]
+    ];
 
     process_p.viz_process("m_inc2_1_P");
     process_q.viz_process("m_inc2_1_Q");
-    let lts = data::concurrent_composition(&r0, &vec![process_p, process_q]);
+    let lts = data::concurrent_composition(r0, &[process_p, process_q]);
     data::lts_print_deadlock(&lts);
     data::viz_lts("m_inc2_1", &lts);
-}
-
-// guard
-fn always_true(_r: &SharedVars) -> bool {
-    true
-}
-
-// action
-fn increment_t1(r: &SharedVars) -> SharedVars {
-    let mut s = r.clone();
-    s.t1 = r.t1 + 1;
-    s
-}
-
-fn increment_t2(r: &SharedVars) -> SharedVars {
-    let mut s = r.clone();
-    s.t2 = r.t2 + 1;
-    s
-}
-
-fn move_t1_to_x(r: &SharedVars) -> SharedVars {
-    let mut s = r.clone();
-    s.x = r.t1;
-    s
-}
-
-fn move_t2_to_x(r: &SharedVars) -> SharedVars {
-    let mut s = r.clone();
-    s.x = r.t2;
-    s
-}
-
-fn move_x_to_t1(r: &SharedVars) -> SharedVars {
-    let mut s = r.clone();
-    s.t1 = r.x;
-    s
-}
-
-fn move_x_to_t2(r: &SharedVars) -> SharedVars {
-    let mut s = r.clone();
-    s.t2 = r.x;
-    s
-}
-
-fn is_locked(r: &SharedVars) -> bool {
-    r.mutex == 0
-}
-
-fn lock(r: &SharedVars) -> SharedVars {
-    let mut s = r.clone();
-    s.mutex = 1;
-    s
-}
-
-fn unlock(r: &SharedVars) -> SharedVars {
-    let mut s = r.clone();
-    s.mutex = 0;
-    s
 }
